@@ -1,0 +1,7 @@
+Experiment,Features_Removed,RMSE,RMSE_increase_pct
+Exp1_All_Features,None,4.0657,0.0
+Exp2_No_Temporal,"month, quarter, week_of_year",4.1238,1.43
+Exp3_No_Lag,"surplus_lag_1, surplus_lag_7",4.1091,1.07
+Exp4_No_Rolling,"surplus_rolling_mean_7, surplus_rolling_std_7",4.436,9.11
+Exp5_No_Perishability,"PI_final, PI_decay, expiry_risk, heat_index",4.0643,-0.03
+Exp6_No_Festival,"is_festival_day, is_weekend",4.3973,8.16

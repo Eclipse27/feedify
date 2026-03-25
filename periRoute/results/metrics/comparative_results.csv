@@ -1,0 +1,5 @@
+method,total_food_saved_kg,total_waste_kg,total_meals,gini_coefficient,anova_f_stat,anova_p_val,waste_reduction_vs_paps_pct
+PAPS,3909.64,0.0,9774.1,0.6,,,
+Random,3909.64,0.0,9774.1,0.7252,,,0.0
+Nearest,3909.64,0.0,9774.1,0.721,,,0.0
+Demand_Only,3909.64,0.0,9774.1,0.998,,,0.0
