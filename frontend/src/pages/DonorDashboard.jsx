@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { predictSurplus, allocateFood } from '../api/feedify';
+import { fetchLiveWeather } from '../api/weather';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { useToast } from '../components/Toast';
+import RouteViz from '../components/RouteViz';
+import { useToast, ToastContainer } from '../components/Toast';
 import clsx from 'clsx';
 import { ChefHat, Zap, MapPin, CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -23,7 +25,31 @@ export default function DonorDashboard() {
   const [prediction, setPrediction] = useState(null);
   const [allocation, setAllocation] = useState(null);
   const [isDemo, setIsDemo] = useState(false);
-  const { showToast, ToastContainer } = useToast();
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherFetched, setWeatherFetched] = useState(false);
+  const { toasts, showToast, removeToast } = useToast();
+
+  useEffect(() => {
+    if (!form.city) return;
+    
+    setWeatherLoading(true);
+    setWeatherFetched(false);
+    
+    const timer = setTimeout(async () => {
+      const weatherData = await fetchLiveWeather(form.city);
+      if (weatherData) {
+        setForm(prev => ({
+          ...prev,
+          temperature: weatherData.temperature,
+          humidity: weatherData.humidity
+        }));
+        setWeatherFetched(true);
+      }
+      setWeatherLoading(false);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [form.city]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -109,7 +135,15 @@ export default function DonorDashboard() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1.5">City</label>
+                <div className="flex justify-between items-end mb-1.5">
+                  <label className="block text-sm text-gray-400">City</label>
+                  {weatherLoading && <span className="text-xs text-gray-500 animate-pulse">Fetching weather...</span>}
+                  {weatherFetched && !weatherLoading && (
+                    <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full" title="Live weather detected">
+                      🌡 {form.temperature}°C · 💧 {form.humidity}%
+                    </span>
+                  )}
+                </div>
                 <select
                   name="city"
                   value={form.city}
@@ -334,14 +368,18 @@ export default function DonorDashboard() {
                   </div>
                 </div>
 
-                {/* FEATURE 4: Route Summary */}
+                {/* FEATURE 1: Live Route Mapping */}
                 <div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold mb-3">Optimized Route Plan</h3>
-                  <p className="text-sm text-gray-300 mb-2">
-                    {allocation.ngo_city} → {allocation.recommended_ngo} → Asha Foundation → Hope Society
-                  </p>
-                  <p className="text-xs text-gray-400">Total Distance: {(allocation.distance_km * 1.6).toFixed(1)} km</p>
-                  <p className="text-xs text-gray-500">Optimized using Two-Opt</p>
+                  <h3 className="text-lg font-semibold mb-4">Optimized Route Plan</h3>
+                  <RouteViz waypoints={[
+                     { id: 'donor-1', name: 'Your Location', type: 'donor', city: form.city },
+                     { id: 'ngo-1', name: allocation.recommended_ngo, type: 'ngo', city: allocation.ngo_city, distanceFromPrev: allocation.distance_km },
+                     { id: 'ngo-2', name: 'Asha Foundation', type: 'ngo', city: allocation.ngo_city, distanceFromPrev: Math.round(allocation.distance_km * 0.4) },
+                  ]} />
+                  <div className="mt-4 flex items-center justify-between">
+                    <p className="text-xs text-emerald-400">⚡ Route Optimized using Two-Opt Algorithm</p>
+                    <p className="text-sm font-medium text-gray-300">Total Distance: {(allocation.distance_km * 1.6).toFixed(1)} km</p>
+                  </div>
                 </div>
                 </>
               )}
@@ -349,7 +387,7 @@ export default function DonorDashboard() {
           )}
         </div>
       </div>
-      <ToastContainer />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }

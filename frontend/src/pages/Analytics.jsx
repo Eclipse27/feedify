@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { fetchAnalytics } from '../api/feedify';
+import { linearRegression, linearRegressionLine } from 'simple-statistics';
 import StatCard from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
 import { BarChart2, Target, Activity, Percent } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer, ReferenceLine, Cell,
+  Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 
 const CLUSTER_DATA = [
@@ -19,11 +20,12 @@ const CLUSTER_DATA = [
 ];
 
 const SENSITIVITY_WEIGHTS = ['PI', 'Demand', 'Distance', 'Capacity', 'TimeUrg'];
-const SENSITIVITY_DATA = SENSITIVITY_WEIGHTS.flatMap((w) => [
-  { weight: w, delta: '-0.05', waste: 0 },
-  { weight: w, delta: '0', waste: 0 },
-  { weight: w, delta: '+0.05', waste: 0 },
-]);
+const SENSITIVITY_DATA = SENSITIVITY_WEIGHTS.map((w) => ({
+  weight: w,
+  '-0.05': 0,
+  '0': 0,
+  '+0.05': 0,
+}));
 
 // Generate 50 route scenarios
 const ROUTE_DATA = Array.from({ length: 50 }, (_, i) => {
@@ -42,16 +44,49 @@ const CustomTooltip = ({ active, payload, label }) => {
       <p className="text-sm font-medium text-white mb-1">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-xs" style={{ color: p.color || p.stroke }}>
-          {p.name}: {typeof p.value === 'number' ? p.value.toFixed(3) : p.value}
+          {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : p.value}
         </p>
       ))}
     </div>
   );
 };
 
+const generateTrendData = (category) => {
+  const days = [];
+  const baseVols = { 'All': 90, 'Rice': 45, 'Sabzi': 25, 'Dairy': 20 };
+  const base = baseVols[category] || 40;
+  
+  for (let i = -30; i <= 0; i++) {
+    const isWeekend = (new Date().getDay() + i + 7) % 7 === 0 || (new Date().getDay() + i + 7) % 7 === 6;
+    days.push({
+      day: i,
+      date: new Date(Date.now() + i * 86400000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      historical: Math.max(0, base + (i * 0.5) + (isWeekend ? 15 : -5) + (Math.random() * 10)),
+      forecast: null
+    });
+  }
+
+  const points = days.map(d => [d.day, d.historical]);
+  const lrl = linearRegressionLine(linearRegression(points));
+
+  days[30].forecast = days[30].historical;
+
+  for (let i = 1; i <= 7; i++) {
+    const isWeekend = (new Date().getDay() + i + 7) % 7 === 0 || (new Date().getDay() + i + 7) % 7 === 6;
+    days.push({
+      day: i,
+      date: new Date(Date.now() + i * 86400000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      historical: null,
+      forecast: Math.max(0, lrl(i) + (isWeekend ? 15 : -5))
+    });
+  }
+  return days;
+};
+
 export default function Analytics() {
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [trendCategory, setTrendCategory] = useState('All');
 
   useEffect(() => {
     (async () => {
@@ -125,7 +160,9 @@ export default function Analytics() {
               <XAxis dataKey="weight" stroke="#9ca3af" fontSize={12} />
               <YAxis stroke="#9ca3af" fontSize={12} domain={[0, 1]} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="waste" name="Total Waste (kg)" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="-0.05" name="δ = -0.05" fill="#f87171" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="0" name="δ = 0" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="+0.05" name="δ = +0.05" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           <div className="mt-4 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
@@ -157,6 +194,42 @@ export default function Analytics() {
               📊 Statistical significance: <span className="font-semibold font-mono">p = 1.99e-7</span> — Two-Opt consistently outperforms Greedy routing.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* FEATURE 6: 7-Day Trend Forecasting */}
+      <section>
+        <div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-1">7-Day Food Waste Trend Forecast</h3>
+              <p className="text-sm text-gray-400">Projected volume using 30-day Historical Linear Regression</p>
+            </div>
+            <select
+              value={trendCategory}
+              onChange={(e) => setTrendCategory(e.target.value)}
+              className="bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500/50"
+            >
+              <option value="All">All Categories</option>
+              <option value="Rice">Rice Base</option>
+              <option value="Sabzi">Sabzi Bases</option>
+              <option value="Dairy">Dairy Items</option>
+            </select>
+          </div>
+          
+          <ResponsiveContainer width="100%" height={320}>
+            <LineChart data={generateTrendData(trendCategory)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} minTickGap={30} />
+              <YAxis stroke="#9ca3af" fontSize={12} label={{ value: 'Vol (kg)', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 12 }} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <ReferenceLine x={new Date().toLocaleDateString(undefined, {month:'short', day:'numeric'})} stroke="#9ca3af" strokeDasharray="3 3" label={{ value: 'Today', fill: '#9ca3af', fontSize: 11, position: 'top' }} />
+              
+              <Line type="monotone" dataKey="historical" name="30-Day History" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="forecast" name="7-Day Forecast" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </section>
     </div>

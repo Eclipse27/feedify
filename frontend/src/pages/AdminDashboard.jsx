@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { fetchAnalytics } from '../api/feedify';
 import StatCard from '../components/StatCard';
 import SkeletonCard from '../components/SkeletonCard';
+import RouteViz from '../components/RouteViz';
 import clsx from 'clsx';
 import { LayoutDashboard, Utensils, Users, TrendingDown, Building2 } from 'lucide-react';
 import {
@@ -59,6 +60,17 @@ export default function AdminDashboard() {
   }, []);
 
   const s = data?.summary || {};
+
+  const getMockCoordinates = (city, isDonor = false) => {
+    const base = {
+      'Mumbai': [19.0760, 72.8777], 'Delhi': [28.7041, 77.1025], 'Chennai': [13.0827, 80.2707],
+      'Bengaluru': [12.9716, 77.5946], 'Kolkata': [22.5726, 88.3639], 'Hyderabad': [17.3850, 78.4867],
+    }[city] || [20.5937, 78.9629];
+    if (isDonor) return base;
+    return [base[0] + (Math.random() * 0.15 - 0.075), base[1] + (Math.random() * 0.15 - 0.075)];
+  };
+
+  const topTx = data?.recent_allocations?.[0];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 sm:py-12">
@@ -130,11 +142,29 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* SECTION 3 — Recent Transactions */}
-      <section className="mb-10">
-        <h3 className="text-lg font-semibold mb-4">Recent Transactions</h3>
-        <div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
+      {/* FEATURE 1: Live Route Mapping (Admin Over-watch) */}
+      <section className="mb-10 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl p-6">
+           <h3 className="text-lg font-semibold mb-1">Global Allocation Maps</h3>
+           <p className="text-sm text-gray-400 mb-5">Latest live network allocation pipeline overview</p>
+           {topTx ? (
+             <RouteViz waypoints={[
+                { id: 'ad-don-1', name: 'Latest Donor', type: 'donor', city: topTx.donors?.city },
+                { id: 'ad-ngo-1', name: topTx.ngos?.ngo_name, type: 'ngo', city: topTx.ngos?.city }
+             ]} />
+           ) : (
+             <div className="w-full h-[300px] border border-gray-800/50 border-dashed rounded-xl flex items-center justify-center text-gray-600">
+               No routes processing globally
+             </div>
+           )}
+        </div>
+
+        {/* SECTION 3 — Recent Transactions */}
+        <div className="bg-gray-900/60 border border-gray-800/50 rounded-2xl overflow-hidden shadow-sm h-full flex flex-col">
+          <div className="p-6 pb-2 border-b border-gray-800/50">
+            <h3 className="text-lg font-semibold">Recent Admin Transactions</h3>
+          </div>
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800/50">

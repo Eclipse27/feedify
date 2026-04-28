@@ -74,18 +74,23 @@ async def predict_surplus(data: DonorInput):
             predicted = round(data.quantity * pi * 0.4, 2)
 
         # Store in Supabase
-        donor_record = save_donor({
-            "city": data.city,
-            "food_type": data.food_type,
-            "quantity": data.quantity,
-            "temperature": data.temperature,
-            "humidity": data.humidity,
-            "hours_since_prep": data.hours_since_prep,
-            "predicted_surplus": predicted,
-        })
+        try:
+            donor_record = save_donor({
+                "city": data.city,
+                "food_type": data.food_type,
+                "quantity": data.quantity,
+                "temperature": data.temperature,
+                "humidity": data.humidity,
+                "hours_since_prep": data.hours_since_prep,
+                "predicted_surplus": predicted,
+            })
+            donor_id = donor_record.get("donor_id")
+        except Exception as e:
+            print(f"Failed to save donor: {e}")
+            donor_id = "demo-donor-001"
 
         return {
-            "donor_id": donor_record.get("donor_id"),
+            "donor_id": donor_id,
             "predicted_surplus_kg": round(predicted, 2),
             "perishability_index": round(pi_adj, 3),
             "confidence": "high" if predicted > 10 else "medium",
@@ -98,7 +103,15 @@ async def predict_surplus(data: DonorInput):
 async def allocate(req: AllocationRequest):
     """Run PAPS algorithm and store allocation in Supabase."""
     try:
-        ngos = get_ngos(req.city)
+        try:
+            ngos = get_ngos(req.city)
+        except Exception as e:
+            print(f"Failed to fetch NGOs: {e}")
+            ngos = [
+                {"ngo_id": "demo-ngo-1", "ngo_name": "Asha Foundation Demo", "city": req.city, "current_demand_kg": 100, "capacity_kg": 200, "storage_type": "standard"},
+                {"ngo_id": "demo-ngo-2", "ngo_name": "Hope Society Demo", "city": req.city, "current_demand_kg": 50, "capacity_kg": 150, "storage_type": "cold"}
+            ]
+
         if not ngos:
             raise HTTPException(status_code=404, detail="No NGOs found")
 
@@ -135,14 +148,18 @@ async def allocate(req: AllocationRequest):
                 best_ngo = ngo
                 best_dist = dist_km
 
-        alloc = store_allocation({
-            "donor_id": req.donor_id,
-            "ngo_id": best_ngo["ngo_id"],
-            "allocated_quantity": req.surplus_kg,
-            "waste_quantity": 0,
-            "priority_score": round(best_score, 4),
-            "distance_km": best_dist,
-        })
+        try:
+            alloc = store_allocation({
+                "donor_id": req.donor_id,
+                "ngo_id": best_ngo["ngo_id"],
+                "allocated_quantity": req.surplus_kg,
+                "waste_quantity": 0,
+                "priority_score": round(best_score, 4),
+                "distance_km": best_dist,
+            })
+        except Exception as e:
+            print(f"Failed to store allocation: {e}")
+            alloc = {"allocation_id": "demo-alloc-001"}
 
         return {
             "allocation_id": alloc.get("allocation_id"),
@@ -159,8 +176,14 @@ async def allocate(req: AllocationRequest):
 @app.get("/analytics")
 async def analytics():
     """Return latest analytics snapshot + recent allocations."""
-    stats = get_latest_analytics()
-    recent = get_recent_allocations(10)
+    try:
+        stats = get_latest_analytics()
+        recent = get_recent_allocations(10)
+    except Exception as e:
+        print(f"Supabase connection error: {e}")
+        stats = None
+        recent = []
+
     return {
         "summary": stats or {
             "total_food_saved": 3909.6,

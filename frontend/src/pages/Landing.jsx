@@ -65,14 +65,14 @@ export default function Landing() {
             onClick={() => navigate('/donor')}
             className="group px-8 py-3.5 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-xl hover:from-emerald-400 hover:to-green-500 transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
           >
-            I'm a Donor
+            I&apos;m a Donor
             <ArrowRight size={18} className="transition-transform duration-200 group-hover:translate-x-1" />
           </button>
           <button
             onClick={() => navigate('/ngo')}
             className="px-8 py-3.5 bg-white/5 border border-white/10 text-white font-semibold rounded-xl hover:bg-white/10 transition-all duration-200"
           >
-            I'm an NGO
+            I&apos;m an NGO
           </button>
         </div>
 

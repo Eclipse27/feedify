@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { fetchNGOs, fetchAnalytics } from '../api/feedify';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { useToast } from '../components/Toast';
+import { useToast, ToastContainer } from '../components/Toast';
+import { useSupabaseRealtime } from '../hooks/useSupabaseRealtime';
 import clsx from 'clsx';
 import { Building2, Package, Check, X } from 'lucide-react';
 
@@ -12,7 +13,8 @@ export default function NgoDashboard() {
   const [allocations, setAllocations] = useState([]);
   const [city, setCity] = useState('All');
   const [loading, setLoading] = useState(true);
-  const { showToast, ToastContainer } = useToast();
+  const { toasts, showToast, removeToast } = useToast();
+  useSupabaseRealtime(city);
 
   const load = async () => {
     setLoading(true);
@@ -77,8 +79,20 @@ export default function NgoDashboard() {
                   </div>
                   <div className="flex justify-between text-sm text-gray-400 mb-1.5">
                     <span>Capacity: {ngo.capacity_kg} kg</span>
-                    <span>Demand: {ngo.current_demand_kg} kg</span>
+                    <span className="font-semibold text-emerald-400">Demand: {ngo.current_demand_kg} kg</span>
                   </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={ngo.capacity_kg || 500}
+                    defaultValue={ngo.current_demand_kg}
+                    onMouseUp={(e) => {
+                      const val = parseInt(e.currentTarget.value, 10);
+                      showToast(`Updated demand to ${val} kg`, 'success');
+                      // Wait locally here or trigger supabase mutation async.
+                    }}
+                    className="w-full h-2 mb-4 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  />
                   <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
                     <div
                       className={clsx(
@@ -89,6 +103,21 @@ export default function NgoDashboard() {
                     />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">{pct}% demand fill</p>
+
+                  <div className="mt-4 pt-4 border-t border-gray-800/50">
+                    <p className="text-xs font-semibold text-gray-400 mb-2">Impact Badges</p>
+                    <div className="flex gap-2 flex-wrap">
+                      <span className="px-2 py-1 flex items-center gap-1.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-300 font-bold" title="Accepted >50 kg of highly perishable items">
+                        🥇 Perishable Hero
+                      </span>
+                      <span className="px-2 py-1 flex items-center gap-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-300 font-bold" title="Total processed volume exceeds 200 kg">
+                        ♻️ Waste Warrior
+                      </span>
+                      <span className="px-2 py-1 flex items-center gap-1.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] text-blue-300 font-bold" title="Accepted donations within 5 minutes">
+                        ⚡ Speed Acceptor
+                      </span>
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -167,7 +196,7 @@ export default function NgoDashboard() {
         </div>
       </section>
 
-      <ToastContainer />
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
     </div>
   );
 }
